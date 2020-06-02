@@ -21,7 +21,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Cnc.Traits
 {
-	public class MinelayerInfo : ITraitInfo, Requires<RearmableInfo>
+	public class MinelayerInfo : TraitInfo, Requires<RearmableInfo>
 	{
 		[ActorReference]
 		public readonly string Mine = "minv";
@@ -43,7 +43,7 @@ namespace OpenRA.Mods.Cnc.Traits
 		[Desc("Sprite overlay to use for minefield cells hidden behind fog or shroud.")]
 		public readonly string TileUnknownName = "build-unknown";
 
-		public object Create(ActorInitializer init) { return new Minelayer(init.Self, this); }
+		public override object Create(ActorInitializer init) { return new Minelayer(init.Self, this); }
 	}
 
 	public class Minelayer : IIssueOrder, IResolveOrder, ISync, IIssueDeployOrder, IOrderVoice, ITick
@@ -98,7 +98,7 @@ namespace OpenRA.Mods.Cnc.Traits
 			return new Order("PlaceMine", self, Target.FromCell(self.World, self.Location), queued);
 		}
 
-		bool IIssueDeployOrder.CanIssueDeployOrder(Actor self) { return true; }
+		bool IIssueDeployOrder.CanIssueDeployOrder(Actor self, bool queued) { return true; }
 
 		void IResolveOrder.ResolveOrder(Actor self, Order order)
 		{
@@ -115,7 +115,7 @@ namespace OpenRA.Mods.Cnc.Traits
 				var movement = self.Trait<IPositionable>();
 
 				var minefield = GetMinefieldCells(minefieldStart, cell, Info.MinefieldDepth)
-					.Where(c => movement.CanEnterCell(c, null, BlockedByActor.Immovable) || self.World.FogObscures(c))
+					.Where(c => movement.CanEnterCell(c, null, BlockedByActor.Immovable) || !self.Owner.Shroud.IsVisible(c))
 					.OrderBy(c => (c - minefieldStart).LengthSquared).ToList();
 
 				self.QueueActivity(order.Queued, new LayMines(self, minefield));
@@ -231,13 +231,14 @@ namespace OpenRA.Mods.Cnc.Traits
 					minelayers.Max(m => m.Info.TraitInfo<MinelayerInfo>().MinefieldDepth));
 
 				var movement = minelayer.Trait<IPositionable>();
+				var mobile = movement as Mobile;
 				var pal = wr.Palette(TileSet.TerrainPaletteInternalName);
 				foreach (var c in minefield)
 				{
 					var tile = tileOk;
 					if (world.FogObscures(c))
 						tile = tileUnknown;
-					else if (!movement.CanEnterCell(c, null, BlockedByActor.Immovable))
+					else if (!movement.CanEnterCell(c, null, BlockedByActor.Immovable) || (mobile != null && !mobile.CanStayInCell(c)))
 						tile = tileBlocked;
 
 					yield return new SpriteRenderable(tile, world.Map.CenterOfCell(c),

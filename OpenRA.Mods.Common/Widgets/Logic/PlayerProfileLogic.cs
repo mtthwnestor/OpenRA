@@ -270,7 +270,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 
 			// Negotiate the label length that the tooltip will allow
 			var maxLabelWidth = 0;
-			var templateIcon = badgeTemplate.Get<SpriteWidget>("ICON");
+			var templateIcon = badgeTemplate.Get("ICON");
 			var templateLabel = badgeTemplate.Get<LabelWidget>("LABEL");
 			var templateLabelFont = Game.Renderer.Fonts[templateLabel.Font];
 			foreach (var badge in profile.Badges)
@@ -285,8 +285,8 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			foreach (var badge in profile.Badges)
 			{
 				var b = badgeTemplate.Clone();
-				var icon = b.Get<SpriteWidget>("ICON");
-				icon.GetSprite = () => badge.Icon24;
+				var icon = b.Get<BadgeWidget>("ICON");
+				icon.Badge = badge;
 
 				var label = b.Get<LabelWidget>("LABEL");
 				var labelFont = Game.Renderer.Fonts[label.Font];
@@ -322,8 +322,11 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 
 			if (client.Location != null)
 			{
+				var locationFont = Game.Renderer.Fonts[locationLabel.Font];
+				var locationWidth = widget.Bounds.Width - 2 * locationLabel.Bounds.X;
+				var location = WidgetUtils.TruncateText(client.Location, locationWidth, locationFont);
 				locationLabel.IsVisible = () => true;
-				locationLabel.GetText = () => client.Location;
+				locationLabel.GetText = () => location;
 				widget.Bounds.Height += locationLabel.Bounds.Height;
 				ipLabel.Bounds.Y += locationLabel.Bounds.Height;
 				adminLabel.Bounds.Y += locationLabel.Bounds.Height;

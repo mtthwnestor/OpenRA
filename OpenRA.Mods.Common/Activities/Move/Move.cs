@@ -30,6 +30,14 @@ namespace OpenRA.Mods.Common.Activities
 		readonly Actor ignoreActor;
 		readonly Color? targetLineColor;
 
+		static readonly BlockedByActor[] PathSearchOrder =
+		{
+			BlockedByActor.All,
+			BlockedByActor.Immovable,
+			BlockedByActor.Stationary,
+			BlockedByActor.None
+		};
+
 		List<CPos> path;
 		CPos? destination;
 
@@ -149,9 +157,13 @@ namespace OpenRA.Mods.Common.Activities
 				destination = mobile.CanEnterCell(movableDestination, check: BlockedByActor.Immovable) ? movableDestination : (CPos?)null;
 			}
 
-			path = EvalPath(BlockedByActor.Stationary);
-			if (path.Count == 0)
-				path = EvalPath(BlockedByActor.None);
+			// TODO: Change this to BlockedByActor.Stationary after improving the local avoidance behaviour
+			foreach (var check in PathSearchOrder)
+			{
+				path = EvalPath(check);
+				if (path.Count > 0)
+					return;
+			}
 		}
 
 		public override bool Tick(Actor self)
@@ -230,8 +242,29 @@ namespace OpenRA.Mods.Common.Activities
 				var cellRange = nearEnough.Length / 1024;
 				if (!containsTemporaryBlocker && (mobile.ToCell - destination.Value).LengthSquared <= cellRange * cellRange && mobile.CanStayInCell(mobile.ToCell))
 				{
-					path.Clear();
-					return null;
+					// Apply some simple checks to avoid giving up in cases where we can be confident that
+					// nudging/waiting/repathing should produce better results.
+
+					// Avoid fighting over the destination cell
+					if (path.Count < 2)
+					{
+						path.Clear();
+						return null;
+					}
+
+					// We can reasonably assume that the blocker is friendly and has a similar locomotor type.
+					// If there is a free cell next to the blocker that is a similar or closer distance to the
+					// destination then we can probably nudge or path around it.
+					var blockerDistSq = (nextCell - destination.Value).LengthSquared;
+					var nudgeOrRepath = CVec.Directions
+						.Select(d => nextCell + d)
+						.Any(c => c != self.Location && (c - destination.Value).LengthSquared <= blockerDistSq && mobile.CanEnterCell(c, ignoreActor));
+
+					if (!nudgeOrRepath)
+					{
+						path.Clear();
+						return null;
+					}
 				}
 
 				// There is no point in waiting for the other actor to move if it is incapable of moving.
@@ -272,7 +305,7 @@ namespace OpenRA.Mods.Common.Activities
 					var newCell = path[path.Count - 1];
 					path.RemoveAt(path.Count - 1);
 
-					return Pair.New(newCell, mobile.GetAvailableSubCell(nextCell, SubCell.Any, ignoreActor));
+					return Pair.New(newCell, mobile.GetAvailableSubCell(nextCell, mobile.FromSubCell, ignoreActor));
 				}
 				else if (mobile.IsBlocking)
 				{
@@ -283,7 +316,7 @@ namespace OpenRA.Mods.Common.Activities
 						if ((nextCell - newCell).Value.LengthSquared > 2)
 							path.Add(mobile.ToCell);
 
-						return Pair.New(newCell.Value, mobile.GetAvailableSubCell(newCell.Value, SubCell.Any, ignoreActor));
+						return Pair.New(newCell.Value, mobile.GetAvailableSubCell(newCell.Value, mobile.FromSubCell, ignoreActor));
 					}
 				}
 
@@ -293,7 +326,7 @@ namespace OpenRA.Mods.Common.Activities
 			hasWaited = false;
 			path.RemoveAt(path.Count - 1);
 
-			return Pair.New(nextCell, mobile.GetAvailableSubCell(nextCell, SubCell.Any, ignoreActor));
+			return Pair.New(nextCell, mobile.GetAvailableSubCell(nextCell, mobile.FromSubCell, ignoreActor));
 		}
 
 		protected override void OnLastRun(Actor self)
@@ -315,9 +348,14 @@ namespace OpenRA.Mods.Common.Activities
 
 		public override void Cancel(Actor self, bool keepQueue = false)
 		{
+			Cancel(self, keepQueue, false);
+		}
+
+		public void Cancel(Actor self, bool keepQueue, bool forceClearPath)
+		{
 			// We need to clear the path here in order to prevent MovePart queueing new instances of itself
 			// when the unit is making a turn.
-			if (path != null && mobile.CanStayInCell(mobile.ToCell))
+			if (path != null && (forceClearPath || mobile.CanStayInCell(mobile.ToCell)))
 				path.Clear();
 
 			base.Cancel(self, keepQueue);
@@ -426,6 +464,7 @@ namespace OpenRA.Mods.Common.Activities
 					else
 						pos = WPos.Lerp(From, To, moveFraction, MoveFractionTotal);
 
+					pos -= new WVec(WDist.Zero, WDist.Zero, self.World.Map.DistanceAboveTerrain(pos));
 					mobile.SetVisualPosition(self, pos);
 				}
 				else

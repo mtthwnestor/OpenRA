@@ -17,7 +17,7 @@ using OpenRA.Traits;
 namespace OpenRA.Mods.Common.Traits
 {
 	[Desc("Used to waypoint units after production or repair is finished.")]
-	public class RallyPointInfo : ITraitInfo
+	public class RallyPointInfo : TraitInfo
 	{
 		public readonly string Image = "rallypoint";
 
@@ -30,6 +30,7 @@ namespace OpenRA.Mods.Common.Traits
 		[SequenceReference("Image")]
 		public readonly string CirclesSequence = "circles";
 
+		[Desc("Cursor to display when rally point can be set.")]
 		public readonly string Cursor = "ability";
 
 		[PaletteReference("IsPlayerPalette")]
@@ -39,9 +40,14 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Custom palette is a player palette BaseName")]
 		public readonly bool IsPlayerPalette = true;
 
-		public readonly CVec Offset = new CVec(1, 3);
+		[Desc("A list of 0 or more offsets defining the initial rally point path.")]
+		public readonly CVec[] Path = { };
 
-		public object Create(ActorInitializer init) { return new RallyPoint(init.Self, this); }
+		[NotificationReference("Speech")]
+		[Desc("The speech notification to play when setting a new rallypoint.")]
+		public readonly string Notification = null;
+
+		public override object Create(ActorInitializer init) { return new RallyPoint(init.Self, this); }
 	}
 
 	public class RallyPoint : IIssueOrder, IResolveOrder, INotifyOwnerChanged, INotifyCreated
@@ -57,7 +63,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public void ResetPath(Actor self)
 		{
-			Path = new List<CPos> { self.Location + Info.Offset };
+			Path = Info.Path.Select(p => self.Location + p).ToList();
 		}
 
 		public RallyPoint(Actor self, RallyPointInfo info)
@@ -95,6 +101,8 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			if (order.OrderID == OrderID)
 			{
+				Game.Sound.PlayNotification(self.World.Map.Rules, self.Owner, "Speech", Info.Notification, self.Owner.Faction.InternalName);
+
 				return new Order(order.OrderID, self, target, queued)
 				{
 					SuppressVisualFeedback = true,

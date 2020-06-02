@@ -20,7 +20,7 @@ using OpenRA.Widgets;
 namespace OpenRA.Mods.Common.Traits
 {
 	[Desc("This trait allows setting a time limit on matches. Attach this to the World actor.")]
-	public class TimeLimitManagerInfo : ITraitInfo, ILobbyOptions, IRulesetLoaded
+	public class TimeLimitManagerInfo : TraitInfo, ILobbyOptions, IRulesetLoaded
 	{
 		[Desc("Label that will be shown for the time limit option in the lobby.")]
 		public readonly string TimeLimitLabel = "Time Limit";
@@ -89,7 +89,7 @@ namespace OpenRA.Mods.Common.Traits
 				new ReadOnlyDictionary<string, string>(timelimits), TimeLimitDefault.ToString(), TimeLimitLocked);
 		}
 
-		public object Create(ActorInitializer init) { return new TimeLimitManager(init.Self, this); }
+		public override object Create(ActorInitializer init) { return new TimeLimitManager(init.Self, this); }
 	}
 
 	public class TimeLimitManager : INotifyTimeLimit, ITick, IWorldLoaded
@@ -158,7 +158,7 @@ namespace OpenRA.Mods.Common.Traits
 			{
 				if (ticksRemaining == m * 60 * ticksPerSecond)
 				{
-					Game.AddSystemLine("Battlefield Control", Notification.F(m, m > 1 ? "s" : null));
+					Game.AddSystemLine(Notification.F(m, m > 1 ? "s" : null));
 
 					var faction = self.World.LocalPlayer == null ? null : self.World.LocalPlayer.Faction.InternalName;
 					Game.Sound.PlayNotification(self.World.Map.Rules, self.World.LocalPlayer, "Speech", info.TimeLimitWarnings[m], faction);
@@ -172,7 +172,7 @@ namespace OpenRA.Mods.Common.Traits
 				countdownLabel.GetText = () => null;
 
 			if (!info.SkipTimerExpiredNotification)
-				Game.AddSystemLine("Battlefield Control", "Time limit has expired.");
+				Game.AddSystemLine("Time limit has expired.");
 		}
 	}
 }

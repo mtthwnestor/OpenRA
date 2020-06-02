@@ -36,18 +36,26 @@ namespace OpenRA.Mods.Common.Traits
 		public override object Create(ActorInitializer init) { return new FreeActorWithDelivery(init, this); }
 	}
 
-	public class FreeActorWithDelivery
+	public class FreeActorWithDelivery : FreeActor
 	{
-		public readonly FreeActorWithDeliveryInfo Info;
-
+		readonly FreeActorWithDeliveryInfo info;
 		readonly Actor self;
 
 		public FreeActorWithDelivery(ActorInitializer init, FreeActorWithDeliveryInfo info)
+			: base(init, info)
 		{
 			self = init.Self;
-			Info = info;
+			this.info = info;
+		}
 
-			DoDelivery(self.Location + info.DeliveryOffset, info.Actor, info.DeliveringActor);
+		protected override void TraitEnabled(Actor self)
+		{
+			if (!allowSpawn)
+				return;
+
+			allowSpawn = info.AllowRespawn;
+
+			DoDelivery(self.Location + info.DeliveryOffset, Info.Actor, info.DeliveringActor);
 		}
 
 		public void DoDelivery(CPos location, string actorName, string carrierActorName)
@@ -61,7 +69,7 @@ namespace OpenRA.Mods.Common.Traits
 			carryable.Reserve(cargo, carrier);
 
 			carrier.Trait<Carryall>().AttachCarryable(carrier, cargo);
-			carrier.QueueActivity(new DeliverUnit(carrier, Target.FromCell(self.World, location), Info.DeliveryRange));
+			carrier.QueueActivity(new DeliverUnit(carrier, Target.FromCell(self.World, location), info.DeliveryRange));
 			carrier.QueueActivity(new Fly(carrier, Target.FromCell(self.World, self.World.Map.ChooseRandomEdgeCell(self.World.SharedRandom))));
 			carrier.QueueActivity(new RemoveSelf());
 
@@ -71,7 +79,7 @@ namespace OpenRA.Mods.Common.Traits
 		void CreateActors(string actorName, string deliveringActorName, out Actor cargo, out Actor carrier)
 		{
 			// Get a carryall spawn location
-			var location = Info.SpawnLocation;
+			var location = info.SpawnLocation;
 			if (location == CPos.Zero)
 				location = self.World.Map.ChooseClosestEdgeCell(self.Location);
 
@@ -80,7 +88,7 @@ namespace OpenRA.Mods.Common.Traits
 			var initialFacing = self.World.Map.FacingBetween(location, self.Location, 0);
 
 			// If aircraft, spawn at cruise altitude
-			var aircraftInfo = self.World.Map.Rules.Actors[deliveringActorName.ToLower()].TraitInfoOrDefault<AircraftInfo>();
+			var aircraftInfo = self.World.Map.Rules.Actors[deliveringActorName.ToLowerInvariant()].TraitInfoOrDefault<AircraftInfo>();
 			if (aircraftInfo != null)
 				spawn += new WVec(0, 0, aircraftInfo.CruiseAltitude.Length);
 

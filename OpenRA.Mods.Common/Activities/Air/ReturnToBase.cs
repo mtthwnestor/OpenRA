@@ -26,7 +26,7 @@ namespace OpenRA.Mods.Common.Activities
 		readonly Rearmable rearmable;
 		readonly bool alwaysLand;
 		Actor dest;
-		int facing = -1;
+		WAngle? facing;
 
 		public ReturnToBase(Actor self, Actor dest = null, bool alwaysLand = false)
 		{
@@ -111,10 +111,10 @@ namespace OpenRA.Mods.Common.Activities
 
 			if (ShouldLandAtBuilding(self, dest))
 			{
-				var exit = dest.FirstExitOrDefault(null);
+				var exit = dest.FirstExitOrDefault();
 				var offset = exit != null ? exit.Info.SpawnOffset : WVec.Zero;
 				if (aircraft.Info.TurnToDock || !aircraft.Info.VTOL)
-					facing = aircraft.Info.InitialFacing;
+					facing = WAngle.FromFacing(aircraft.Info.InitialFacing);
 
 				aircraft.MakeReservation(dest);
 				QueueChild(new Land(self, Target.FromActor(dest), offset, facing, Color.Green));

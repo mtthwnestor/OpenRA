@@ -16,7 +16,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	public class PluggableInfo : ITraitInfo
+	public class PluggableInfo : TraitInfo
 	{
 		[Desc("Footprint cell offset where a plug can be placed.")]
 		public readonly CVec Offset = CVec.Zero;
@@ -41,7 +41,7 @@ namespace OpenRA.Mods.Common.Traits
 			get { return Requirements.Values.SelectMany(r => r.Variables).Distinct(); }
 		}
 
-		public object Create(ActorInitializer init) { return new Pluggable(init, this); }
+		public override object Create(ActorInitializer init) { return new Pluggable(init, this); }
 	}
 
 	public class Pluggable : IObservesVariables, INotifyCreated
@@ -49,8 +49,7 @@ namespace OpenRA.Mods.Common.Traits
 		public readonly PluggableInfo Info;
 
 		readonly string initialPlug;
-		ConditionManager conditionManager;
-		int conditionToken = ConditionManager.InvalidConditionToken;
+		int conditionToken = Actor.InvalidConditionToken;
 		Dictionary<string, bool> plugTypesAvailability = null;
 
 		string active;
@@ -59,7 +58,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			Info = info;
 
-			var plugInit = init.Contains<PlugsInit>() ? init.Get<PlugsInit, Dictionary<CVec, string>>() : new Dictionary<CVec, string>();
+			var plugInit = init.GetValue<PlugsInit, Dictionary<CVec, string>>(info, new Dictionary<CVec, string>());
 			if (plugInit.ContainsKey(Info.Offset))
 				initialPlug = plugInit[Info.Offset];
 
@@ -73,8 +72,6 @@ namespace OpenRA.Mods.Common.Traits
 
 		void INotifyCreated.Created(Actor self)
 		{
-			conditionManager = self.TraitOrDefault<ConditionManager>();
-
 			if (!string.IsNullOrEmpty(initialPlug))
 				EnablePlug(self, initialPlug);
 		}
@@ -96,10 +93,10 @@ namespace OpenRA.Mods.Common.Traits
 			if (!Info.Conditions.TryGetValue(type, out condition))
 				return;
 
-			if (conditionToken != ConditionManager.InvalidConditionToken)
-				conditionManager.RevokeCondition(self, conditionToken);
+			if (conditionToken != Actor.InvalidConditionToken)
+				self.RevokeCondition(conditionToken);
 
-			conditionToken = conditionManager.GrantCondition(self, condition);
+			conditionToken = self.GrantCondition(condition);
 			active = type;
 		}
 
@@ -108,8 +105,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (type != active)
 				return;
 
-			if (conditionToken != ConditionManager.InvalidConditionToken)
-				conditionToken = conditionManager.RevokeCondition(self, conditionToken);
+			if (conditionToken != Actor.InvalidConditionToken)
+				conditionToken = self.RevokeCondition(conditionToken);
 
 			active = null;
 		}
@@ -129,6 +126,6 @@ namespace OpenRA.Mods.Common.Traits
 		readonly Dictionary<CVec, string> value = new Dictionary<CVec, string>();
 		public PlugsInit() { }
 		public PlugsInit(Dictionary<CVec, string> init) { value = init; }
-		public Dictionary<CVec, string> Value(World world) { return value; }
+		public Dictionary<CVec, string> Value { get { return value; } }
 	}
 }

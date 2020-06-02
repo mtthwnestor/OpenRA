@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using OpenRA.Mods.Cnc.FileFormats;
 using OpenRA.Mods.Common.FileFormats;
 using OpenRA.Mods.Common.UtilityCommands;
 using OpenRA.Primitives;
@@ -84,10 +85,13 @@ namespace OpenRA.Mods.Cnc.UtilityCommands
 		static string[] overlayActors = new string[]
 		{
 			// Fences
-			"sbag", "cycl", "brik", "fenc", "wood", "wood",
+			"sbag", "cycl", "brik", "fenc", "wood",
 
 			// Fields
-			"v12", "v13", "v14", "v15", "v16", "v17", "v18"
+			"v12", "v13", "v14", "v15", "v16", "v17", "v18",
+
+			// Crates
+			"wcrate", "scrate"
 		};
 
 		void UnpackOverlayData(MemoryStream ms)

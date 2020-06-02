@@ -11,7 +11,6 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using OpenRA.Graphics;
 
 namespace OpenRA
 {
@@ -35,19 +34,20 @@ namespace OpenRA
 			var badgesNode = yaml.Nodes.FirstOrDefault(n => n.Key == "Badges");
 			if (badgesNode != null)
 			{
-				try
+				var playerDatabase = Game.ModData.Manifest.Get<PlayerDatabase>();
+				foreach (var badgeNode in badgesNode.Value.Nodes)
 				{
-					var playerDatabase = Game.ModData.Manifest.Get<PlayerDatabase>();
-					foreach (var badgeNode in badgesNode.Value.Nodes)
+					Game.RunAfterTick(() =>
 					{
-						var badge = playerDatabase.LoadBadge(badgeNode.Value);
-						if (badge != null)
-							badges.Add(badge);
-					}
-				}
-				catch
-				{
-					// Discard badges on error
+						// Discard badge on error
+						try
+						{
+							var badge = playerDatabase.LoadBadge(badgeNode.Value);
+							if (badge != null)
+								badges.Add(badge);
+						}
+						catch { }
+					});
 				}
 			}
 
@@ -58,12 +58,16 @@ namespace OpenRA
 	public class PlayerBadge
 	{
 		public readonly string Label;
-		public readonly Sprite Icon24;
+		public readonly string Icon;
+		public readonly string Icon2x;
+		public readonly string Icon3x;
 
-		public PlayerBadge(string label, Sprite icon24)
+		public PlayerBadge(string label, string icon, string icon2x, string icon3x)
 		{
 			Label = label;
-			Icon24 = icon24;
+			Icon = icon;
+			Icon2x = icon2x;
+			Icon3x = icon3x;
 		}
 	}
 }

@@ -74,7 +74,7 @@ namespace OpenRA.Mods.Common.Traits
 				{
 					var init = actor.Init<DeployStateInit>();
 					if (init != null)
-						return init.Value(world) == DeployState.Deployed;
+						return init.Value == DeployState.Deployed;
 
 					return false;
 				},
@@ -98,10 +98,9 @@ namespace OpenRA.Mods.Common.Traits
 		readonly IMove move;
 
 		DeployState deployState;
-		ConditionManager conditionManager;
 		INotifyDeployTriggered[] notify;
-		int deployedToken = ConditionManager.InvalidConditionToken;
-		int undeployedToken = ConditionManager.InvalidConditionToken;
+		int deployedToken = Actor.InvalidConditionToken;
+		int undeployedToken = Actor.InvalidConditionToken;
 
 		public DeployState DeployState { get { return deployState; } }
 
@@ -112,13 +111,11 @@ namespace OpenRA.Mods.Common.Traits
 			checkTerrainType = info.AllowedTerrainTypes.Count > 0;
 			canTurn = self.Info.HasTraitInfo<IFacingInfo>();
 			move = self.TraitOrDefault<IMove>();
-			if (init.Contains<DeployStateInit>())
-				deployState = init.Get<DeployStateInit, DeployState>();
+			deployState = init.GetValue<DeployStateInit, DeployState>(info, DeployState.Undeployed);
 		}
 
 		protected override void Created(Actor self)
 		{
-			conditionManager = self.TraitOrDefault<ConditionManager>();
 			notify = self.TraitsImplementing<INotifyDeployTriggered>().ToArray();
 			base.Created(self);
 
@@ -194,7 +191,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new Order("GrantConditionOnDeploy", self, queued);
 		}
 
-		bool IIssueDeployOrder.CanIssueDeployOrder(Actor self) { return !IsTraitPaused && !IsTraitDisabled; }
+		bool IIssueDeployOrder.CanIssueDeployOrder(Actor self, bool queued) { return !IsTraitPaused && !IsTraitDisabled; }
 
 		public void ResolveOrder(Actor self, Order order)
 		{
@@ -243,16 +240,8 @@ namespace OpenRA.Mods.Common.Traits
 			if (Info.CanDeployOnRamps)
 				return true;
 
-			var ramp = 0;
-			if (self.World.Map.Contains(location))
-			{
-				var tile = self.World.Map.Tiles[location];
-				var ti = self.World.Map.Rules.TileSet.GetTileInfo(tile);
-				if (ti != null)
-					ramp = ti.RampType;
-			}
-
-			return ramp == 0;
+			var map = self.World.Map;
+			return !map.Ramp.Contains(location) || map.Ramp[location] == 0;
 		}
 
 		void INotifyDeployComplete.FinishedDeploy(Actor self)
@@ -317,32 +306,32 @@ namespace OpenRA.Mods.Common.Traits
 
 		void OnDeployStarted()
 		{
-			if (undeployedToken != ConditionManager.InvalidConditionToken)
-				undeployedToken = conditionManager.RevokeCondition(self, undeployedToken);
+			if (undeployedToken != Actor.InvalidConditionToken)
+				undeployedToken = self.RevokeCondition(undeployedToken);
 
 			deployState = DeployState.Deploying;
 		}
 
 		void OnDeployCompleted()
 		{
-			if (conditionManager != null && !string.IsNullOrEmpty(Info.DeployedCondition) && deployedToken == ConditionManager.InvalidConditionToken)
-				deployedToken = conditionManager.GrantCondition(self, Info.DeployedCondition);
+			if (deployedToken == Actor.InvalidConditionToken)
+				deployedToken = self.GrantCondition(Info.DeployedCondition);
 
 			deployState = DeployState.Deployed;
 		}
 
 		void OnUndeployStarted()
 		{
-			if (deployedToken != ConditionManager.InvalidConditionToken)
-				deployedToken = conditionManager.RevokeCondition(self, deployedToken);
+			if (deployedToken != Actor.InvalidConditionToken)
+				deployedToken = self.RevokeCondition(deployedToken);
 
 			deployState = DeployState.Deploying;
 		}
 
 		void OnUndeployCompleted()
 		{
-			if (conditionManager != null && !string.IsNullOrEmpty(Info.UndeployedCondition) && undeployedToken == ConditionManager.InvalidConditionToken)
-				undeployedToken = conditionManager.GrantCondition(self, Info.UndeployedCondition);
+			if (undeployedToken == Actor.InvalidConditionToken)
+				undeployedToken = self.GrantCondition(Info.UndeployedCondition);
 
 			deployState = DeployState.Undeployed;
 		}
@@ -354,6 +343,6 @@ namespace OpenRA.Mods.Common.Traits
 		readonly DeployState value = DeployState.Deployed;
 		public DeployStateInit() { }
 		public DeployStateInit(DeployState init) { value = init; }
-		public DeployState Value(World world) { return value; }
+		public DeployState Value { get { return value; } }
 	}
 }

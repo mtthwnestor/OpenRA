@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using OpenRA.Graphics;
+using OpenRA.Mods.Common.Traits;
 using OpenRA.Primitives;
 using OpenRA.Support;
 using OpenRA.Widgets;
@@ -23,10 +24,12 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 	{
 		enum PanelType { Display, Audio, Input, Hotkeys, Advanced }
 
+		static readonly int OriginalVideoDisplay;
 		static readonly string OriginalSoundDevice;
 		static readonly WindowMode OriginalGraphicsMode;
 		static readonly int2 OriginalGraphicsWindowedSize;
 		static readonly int2 OriginalGraphicsFullscreenSize;
+		static readonly GLProfile OriginalGLProfile;
 		static readonly bool OriginalServerDiscoverNatDevices;
 
 		readonly Dictionary<PanelType, Action> leavePanelActions = new Dictionary<PanelType, Action>();
@@ -52,8 +55,10 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			var original = Game.Settings;
 			OriginalSoundDevice = original.Sound.Device;
 			OriginalGraphicsMode = original.Graphics.Mode;
+			OriginalVideoDisplay = original.Graphics.VideoDisplay;
 			OriginalGraphicsWindowedSize = original.Graphics.WindowedSize;
 			OriginalGraphicsFullscreenSize = original.Graphics.FullscreenSize;
+			OriginalGLProfile = original.Graphics.GLProfile;
 			OriginalServerDiscoverNatDevices = original.Server.DiscoverNatDevices;
 		}
 
@@ -92,8 +97,10 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 				Action closeAndExit = () => { Ui.CloseWindow(); onExit(); };
 				if (current.Sound.Device != OriginalSoundDevice ||
 				    current.Graphics.Mode != OriginalGraphicsMode ||
+					current.Graphics.VideoDisplay != OriginalVideoDisplay ||
 				    current.Graphics.WindowedSize != OriginalGraphicsWindowedSize ||
 					current.Graphics.FullscreenSize != OriginalGraphicsFullscreenSize ||
+				    current.Graphics.GLProfile != OriginalGLProfile ||
 					current.Server.DiscoverNatDevices != OriginalServerDiscoverNatDevices)
 				{
 					Action restart = () =>
@@ -132,7 +139,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			};
 		}
 
-		static void BindCheckboxPref(Widget parent, string id, object group, string pref)
+		public static void BindCheckboxPref(Widget parent, string id, object group, string pref)
 		{
 			var field = group.GetType().GetField(pref);
 			if (field == null)
@@ -218,7 +225,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			resetPanelActions.Add(type, reset(panel));
 		}
 
-		static readonly Dictionary<WorldViewport, string> ViewportSizeNames = new Dictionary<WorldViewport, string>()
+		public static readonly Dictionary<WorldViewport, string> ViewportSizeNames = new Dictionary<WorldViewport, string>()
 		{
 			{ WorldViewport.Close, "Close" },
 			{ WorldViewport.Medium, "Medium" },
@@ -249,8 +256,17 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			windowModeDropdown.GetText = () => ds.Mode == WindowMode.Windowed ?
 				"Windowed" : ds.Mode == WindowMode.Fullscreen ? "Fullscreen (Legacy)" : "Fullscreen";
 
-			var modeChangesDesc = panel.Get("MODE_CHANGES_DESC");
-			modeChangesDesc.IsVisible = () => ds.Mode != WindowMode.Windowed && ds.Mode != OriginalGraphicsMode;
+			var displaySelectionDropDown = panel.Get<DropDownButtonWidget>("DISPLAY_SELECTION_DROPDOWN");
+			displaySelectionDropDown.OnMouseDown = _ => ShowDisplaySelectionDropdown(displaySelectionDropDown, ds);
+			var displaySelectionLabel = new CachedTransform<int, string>(i => "Display {0}".F(i + 1));
+			displaySelectionDropDown.GetText = () => displaySelectionLabel.Update(ds.VideoDisplay);
+			displaySelectionDropDown.IsDisabled = () => Game.Renderer.DisplayCount < 2;
+
+			var glProfileLabel = new CachedTransform<GLProfile, string>(p => p.ToString());
+			var glProfileDropdown = panel.Get<DropDownButtonWidget>("GL_PROFILE_DROPDOWN");
+			glProfileDropdown.OnMouseDown = _ => ShowGLProfileDropdown(glProfileDropdown, ds);
+			glProfileDropdown.GetText = () => glProfileLabel.Update(ds.GLProfile);
+			glProfileDropdown.IsDisabled = () => Game.Renderer.SupportedGLProfiles.Length < 2;
 
 			var statusBarsDropDown = panel.Get<DropDownButtonWidget>("STATUS_BAR_DROPDOWN");
 			statusBarsDropDown.OnMouseDown = _ => ShowStatusBarsDropdown(statusBarsDropDown, gs);
@@ -289,16 +305,18 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 
 			uiScaleDropdown.IsDisabled = () => disableUIScale;
 
+			panel.Get("DISPLAY_SELECTION").IsVisible = () => ds.Mode != WindowMode.Windowed;
 			panel.Get("WINDOW_RESOLUTION").IsVisible = () => ds.Mode == WindowMode.Windowed;
 			var windowWidth = panel.Get<TextFieldWidget>("WINDOW_WIDTH");
 			var origWidthText = windowWidth.Text = ds.WindowedSize.X.ToString();
 
 			var windowHeight = panel.Get<TextFieldWidget>("WINDOW_HEIGHT");
 			var origHeightText = windowHeight.Text = ds.WindowedSize.Y.ToString();
+			windowHeight.Text = ds.WindowedSize.Y.ToString();
 
-			var windowChangesDesc = panel.Get("WINDOW_CHANGES_DESC");
-			windowChangesDesc.IsVisible = () => ds.Mode == WindowMode.Windowed &&
-				(ds.Mode != OriginalGraphicsMode || origWidthText != windowWidth.Text || origHeightText != windowHeight.Text);
+			var restartDesc = panel.Get("RESTART_REQUIRED_DESC");
+			restartDesc.IsVisible = () => ds.Mode != OriginalGraphicsMode || ds.VideoDisplay != OriginalVideoDisplay || ds.GLProfile != OriginalGLProfile ||
+				(ds.Mode == WindowMode.Windowed && (origWidthText != windowWidth.Text || origHeightText != windowHeight.Text));
 
 			var frameLimitCheckbox = panel.Get<CheckboxWidget>("FRAME_LIMIT_CHECKBOX");
 			var frameLimitOrigLabel = frameLimitCheckbox.Text;
@@ -368,7 +386,9 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 				ds.CapFramerate = dds.CapFramerate;
 				ds.MaxFramerate = dds.MaxFramerate;
 				ds.Language = dds.Language;
+				ds.GLProfile = dds.GLProfile;
 				ds.Mode = dds.Mode;
+				ds.VideoDisplay = dds.VideoDisplay;
 				ds.WindowedSize = dds.WindowedSize;
 				ds.CursorDouble = dds.CursorDouble;
 				ds.ViewportDistance = dds.ViewportDistance;
@@ -389,10 +409,12 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 
 		Action InitAudioPanel(Widget panel)
 		{
+			var musicPlaylist = worldRenderer.World.WorldActor.Trait<MusicPlaylist>();
 			var ss = Game.Settings.Sound;
 
 			BindCheckboxPref(panel, "CASH_TICKS", ss, "CashTicks");
 			BindCheckboxPref(panel, "MUTE_SOUND", ss, "Mute");
+			BindCheckboxPref(panel, "MUTE_BACKGROUND_MUSIC", ss, "MuteBackgroundMusic");
 
 			BindSliderPref(panel, "SOUND_VOLUME", ss, "SoundVolume");
 			BindSliderPref(panel, "MUSIC_VOLUME", ss, "MusicVolume");
@@ -411,6 +433,19 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 					Game.Sound.MuteAudio();
 				else
 					Game.Sound.UnmuteAudio();
+			};
+
+			var muteBackgroundMusicCheckbox = panel.Get<CheckboxWidget>("MUTE_BACKGROUND_MUSIC");
+			var muteBackgroundMusicCheckboxOnClick = muteBackgroundMusicCheckbox.OnClick;
+			muteBackgroundMusicCheckbox.OnClick = () =>
+			{
+				muteBackgroundMusicCheckboxOnClick();
+
+				if (!musicPlaylist.AllowMuteBackgroundMusic)
+					return;
+
+				if (musicPlaylist.CurrentSongIsBackground)
+					musicPlaylist.Stop();
 			};
 
 			// Replace controls with a warning label if sound is disabled
@@ -459,6 +494,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 				ss.VideoVolume = dss.VideoVolume;
 				ss.CashTicks = dss.CashTicks;
 				ss.Mute = dss.Mute;
+				ss.MuteBackgroundMusic = dss.MuteBackgroundMusic;
 				ss.Device = dss.Device;
 
 				panel.Get<SliderWidget>("SOUND_VOLUME").Value = ss.SoundVolume;
@@ -476,7 +512,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 		{
 			var gs = Game.Settings.Game;
 
-			BindCheckboxPref(panel, "CLASSIC_MOUSE_MIDDLE_SCROLL_CHECKBOX", gs, "ClassicMouseMiddleScroll");
+			BindCheckboxPref(panel, "ALTERNATE_SCROLL_CHECKBOX", gs, "UseAlternateScrollButton");
 			BindCheckboxPref(panel, "EDGESCROLL_CHECKBOX", gs, "ViewportEdgeScroll");
 			BindCheckboxPref(panel, "LOCKMOUSE_CHECKBOX", gs, "LockMouseWindow");
 			BindSliderPref(panel, "ZOOMSPEED_SLIDER", gs, "ZoomSpeed");
@@ -491,23 +527,20 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			mouseScrollDropdown.OnMouseDown = _ => ShowMouseScrollDropdown(mouseScrollDropdown, gs);
 			mouseScrollDropdown.GetText = () => gs.MouseScroll.ToString();
 
-			var classicMouseMiddleScrollCheckbox = panel.Get<CheckboxWidget>("CLASSIC_MOUSE_MIDDLE_SCROLL_CHECKBOX");
-			classicMouseMiddleScrollCheckbox.IsVisible = () => gs.UseClassicMouseStyle;
-
 			var mouseControlDescClassic = panel.Get("MOUSE_CONTROL_DESC_CLASSIC");
 			mouseControlDescClassic.IsVisible = () => gs.UseClassicMouseStyle;
-
-			var classicScrollRight = mouseControlDescClassic.Get("DESC_SCROLL_RIGHT");
-			classicScrollRight.IsVisible = () => !gs.ClassicMouseMiddleScroll;
-
-			var classicScrollMiddle = mouseControlDescClassic.Get("DESC_SCROLL_MIDDLE");
-			classicScrollMiddle.IsVisible = () => gs.ClassicMouseMiddleScroll;
 
 			var mouseControlDescModern = panel.Get("MOUSE_CONTROL_DESC_MODERN");
 			mouseControlDescModern.IsVisible = () => !gs.UseClassicMouseStyle;
 
 			foreach (var container in new[] { mouseControlDescClassic, mouseControlDescModern })
 			{
+				var classicScrollRight = container.Get("DESC_SCROLL_RIGHT");
+				classicScrollRight.IsVisible = () => gs.UseClassicMouseStyle ^ gs.UseAlternateScrollButton;
+
+				var classicScrollMiddle = container.Get("DESC_SCROLL_MIDDLE");
+				classicScrollMiddle.IsVisible = () => !gs.UseClassicMouseStyle ^ gs.UseAlternateScrollButton;
+
 				var zoomDesc = container.Get("DESC_ZOOM");
 				zoomDesc.IsVisible = () => gs.ZoomModifier == Modifiers.None;
 
@@ -606,7 +639,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			{
 				gs.UseClassicMouseStyle = dgs.UseClassicMouseStyle;
 				gs.MouseScroll = dgs.MouseScroll;
-				gs.ClassicMouseMiddleScroll = dgs.ClassicMouseMiddleScroll;
+				gs.UseAlternateScrollButton = dgs.UseAlternateScrollButton;
 				gs.LockMouseWindow = dgs.LockMouseWindow;
 				gs.ViewportEdgeScroll = dgs.ViewportEdgeScroll;
 				gs.ViewportEdgeScrollStep = dgs.ViewportEdgeScrollStep;
@@ -685,7 +718,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			};
 		}
 
-		static void ShowMouseControlDropdown(DropDownButtonWidget dropdown, GameSettings s)
+		public static void ShowMouseControlDropdown(DropDownButtonWidget dropdown, GameSettings s)
 		{
 			var options = new Dictionary<string, bool>()
 			{
@@ -830,6 +863,38 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			dropdown.ShowDropDown("LABEL_DROPDOWN_TEMPLATE", 500, options.Keys, setupItem);
 		}
 
+		static void ShowDisplaySelectionDropdown(DropDownButtonWidget dropdown, GraphicSettings s)
+		{
+			Func<int, ScrollItemWidget, ScrollItemWidget> setupItem = (o, itemTemplate) =>
+			{
+				var item = ScrollItemWidget.Setup(itemTemplate,
+					() => s.VideoDisplay == o,
+					() => s.VideoDisplay = o);
+
+				var label = "Display {0}".F(o + 1);
+				item.Get<LabelWidget>("LABEL").GetText = () => label;
+				return item;
+			};
+
+			dropdown.ShowDropDown("LABEL_DROPDOWN_TEMPLATE", 500, Enumerable.Range(0, Game.Renderer.DisplayCount), setupItem);
+		}
+
+		static void ShowGLProfileDropdown(DropDownButtonWidget dropdown, GraphicSettings s)
+		{
+			Func<GLProfile, ScrollItemWidget, ScrollItemWidget> setupItem = (o, itemTemplate) =>
+			{
+				var item = ScrollItemWidget.Setup(itemTemplate,
+					() => s.GLProfile == o,
+					() => s.GLProfile = o);
+
+				var label = o.ToString();
+				item.Get<LabelWidget>("LABEL").GetText = () => label;
+				return item;
+			};
+
+			dropdown.ShowDropDown("LABEL_DROPDOWN_TEMPLATE", 500, Game.Renderer.SupportedGLProfiles, setupItem);
+		}
+
 		static void ShowTargetLinesDropdown(DropDownButtonWidget dropdown, GameSettings s)
 		{
 			var options = new Dictionary<string, TargetLinesType>()
@@ -852,7 +917,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 			dropdown.ShowDropDown("LABEL_DROPDOWN_TEMPLATE", 500, options.Keys, setupItem);
 		}
 
-		static void ShowBattlefieldCameraDropdown(DropDownButtonWidget dropdown, WorldViewportSizes viewportSizes, GraphicSettings gs)
+		public static void ShowBattlefieldCameraDropdown(DropDownButtonWidget dropdown, WorldViewportSizes viewportSizes, GraphicSettings gs)
 		{
 			Func<WorldViewport, ScrollItemWidget, ScrollItemWidget> setupItem = (o, itemTemplate) =>
 			{
@@ -921,7 +986,7 @@ namespace OpenRA.Mods.Common.Widgets.Logic
 				RecalculateWidgetLayout(c, insideScrollPanel || w is ScrollPanelWidget);
 		}
 
-		static void ShowUIScaleDropdown(DropDownButtonWidget dropdown, GraphicSettings gs)
+		public static void ShowUIScaleDropdown(DropDownButtonWidget dropdown, GraphicSettings gs)
 		{
 			Func<float, ScrollItemWidget, ScrollItemWidget> setupItem = (o, itemTemplate) =>
 			{

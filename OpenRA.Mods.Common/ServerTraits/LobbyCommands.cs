@@ -67,6 +67,10 @@ namespace OpenRA.Mods.Common.Server
 
 		public static bool ValidateCommand(S server, Connection conn, Session.Client client, string cmd)
 		{
+			// Kick command is always valid for the host
+			if (cmd.StartsWith("kick "))
+				return true;
+
 			if (server.State == ServerState.GameStarted)
 			{
 				server.SendOrderTo(conn, "Message", "Cannot change state when game started. ({0})".F(cmd));
@@ -394,8 +398,17 @@ namespace OpenRA.Mods.Common.Server
 				LoadMapSettings(server, server.LobbyInfo.GlobalSettings, server.Map.Rules);
 
 				// Reset client states
+				var selectableFactions = server.Map.Rules.Actors["world"].TraitInfos<FactionInfo>()
+					.Where(f => f.Selectable)
+					.Select(f => f.InternalName)
+					.ToList();
+
 				foreach (var c in server.LobbyInfo.Clients)
+				{
 					c.State = Session.ClientState.Invalid;
+					if (!selectableFactions.Contains(c.Faction))
+						c.Faction = "Random";
+				}
 
 				// Reassign players into new slots based on their old slots:
 				//  - Observers remain as observers
@@ -584,6 +597,11 @@ namespace OpenRA.Mods.Common.Server
 			}
 
 			var kickClient = server.GetClient(kickConn);
+			if (server.State == ServerState.GameStarted && !kickClient.IsObserver)
+			{
+				server.SendOrderTo(conn, "Message", "Only spectators can be kicked after the game has started.");
+				return true;
+			}
 
 			Log.Write("server", "Kicking client {0}.", kickClientID);
 			server.SendMessage("{0} kicked {1} from the server.".F(client.Name, kickClient.Name));

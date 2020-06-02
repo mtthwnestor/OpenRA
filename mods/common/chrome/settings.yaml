@@ -47,7 +47,7 @@ Background@SETTINGS_PANEL:
 		Button@BACK_BUTTON:
 			Key: escape
 			X: PARENT_RIGHT - 180
-			Y: PARENT_BOTTOM - 45 
+			Y: PARENT_BOTTOM - 45
 			Width: 160
 			Height: 25
 			Text: Back
@@ -91,7 +91,7 @@ Background@SETTINGS_PANEL:
 			X: 5
 			Y: 50
 			Width: PARENT_RIGHT - 10
-			Height: PARENT_BOTTOM
+			Height: PARENT_BOTTOM - 50
 			Children:
 				Label@PLAYER:
 					Text: Player Name:
@@ -214,13 +214,6 @@ Background@SETTINGS_PANEL:
 					Height: 25
 					Font: Regular
 					Text: Windowed
-				Label@MODE_CHANGES_DESC:
-					X: 100
-					Y: 237
-					Width: 200
-					Height: 15
-					Font: Tiny
-					Text: Video mode changes require restart
 				Checkbox@VSYNC_CHECKBOX:
 					X: 310
 					Y: 213
@@ -256,13 +249,21 @@ Background@SETTINGS_PANEL:
 							Height: 25
 							MaxLength: 5
 							Type: Integer
-						Label@WINDOW_CHANGES_DESC:
-							X: 60
-							Y: 27
-							Width: 200
-							Height: 15
-							Font: Tiny
-							Text: Video mode and window size changes require restart
+				Container@DISPLAY_SELECTION:
+					Y: 240
+					Children:
+						Label@DISPLAY_SELECTION_LABEL:
+							X: 15
+							Height: 25
+							Width: 120
+							Align: Right
+							Text: Select Display:
+						DropDownButton@DISPLAY_SELECTION_DROPDOWN:
+							X: 140
+							Width: 160
+							Height: 25
+							Font: Regular
+							Text: Standard
 				Checkbox@FRAME_LIMIT_CHECKBOX:
 					X: 310
 					Y: 243
@@ -278,6 +279,26 @@ Background@SETTINGS_PANEL:
 					Ticks: 20
 					MinimumValue: 50
 					MaximumValue: 240
+				Label@GL_PROFILE:
+					X: 15
+					Y: 270
+					Width: 120
+					Height: 25
+					Align: Right
+					Text: OpenGL Profile:
+				DropDownButton@GL_PROFILE_DROPDOWN:
+					X: 140
+					Y: 270
+					Width: 160
+					Height: 25
+					Font: Regular
+				Label@RESTART_REQUIRED_DESC:
+					Y: PARENT_BOTTOM - 40
+					Width: PARENT_RIGHT
+					Height: 15
+					Font: Tiny
+					Text: Display and OpenGL changes require restart
+					Align: Center
 		Container@AUDIO_PANEL:
 			X: 5
 			Y: 50
@@ -307,6 +328,13 @@ Background@SETTINGS_PANEL:
 							Height: 20
 							Font: Regular
 							Text: Mute Sound
+						Checkbox@MUTE_BACKGROUND_MUSIC:
+							X: 15
+							Y: 103
+							Width: 200
+							Height: 20
+							Font: Regular
+							Text: Mute Background Music
 						Label@SOUND_LABEL:
 							X: PARENT_RIGHT - WIDTH - 270
 							Y: 40
@@ -469,7 +497,12 @@ Background@SETTINGS_PANEL:
 							Height: 16
 							Font: Small
 							Text: - Zoom the battlefield using {MODIFIER + Scroll Wheel}
-						LabelWithHighlight@DESC_SCROLL:
+						LabelWithHighlight@DESC_SCROLL_RIGHT:
+							Y: 85
+							Height: 16
+							Font: Small
+							Text: - Pan the battlefield using the {Right} mouse button
+						LabelWithHighlight@DESC_SCROLL_MIDDLE:
 							Y: 85
 							Height: 16
 							Font: Small
@@ -522,13 +555,13 @@ Background@SETTINGS_PANEL:
 					Height: 20
 					Font: Regular
 					Text: Screen Edge Panning
-				Checkbox@CLASSIC_MOUSE_MIDDLE_SCROLL_CHECKBOX:
+				Checkbox@ALTERNATE_SCROLL_CHECKBOX:
 					X: 360
 					Y: 133
 					Width: 180
 					Height: 20
 					Font: Regular
-					Text: Middle Mouse Panning
+					Text: Alternate Mouse Panning
 				Label@SCROLL_SPEED_LABEL:
 					X: 305
 					Y: 210
@@ -626,7 +659,7 @@ Background@SETTINGS_PANEL:
 													Width: 80
 													Height: 25
 													Align: Left
-													TooltipContainer: TOOLTIP_CONTAINER
+													TooltipContainer: SETTINGS_TOOLTIP_CONTAINER
 										Container@THREE_COLUMN:
 											Width: 173
 											Height: 25
@@ -642,7 +675,7 @@ Background@SETTINGS_PANEL:
 													Width: 80
 													Height: 25
 													Align: Left
-													TooltipContainer: TOOLTIP_CONTAINER
+													TooltipContainer: SETTINGS_TOOLTIP_CONTAINER
 				Background@HOTKEY_DIALOG_ROOT:
 					X: 15
 					Y: 230
@@ -694,7 +727,7 @@ Background@SETTINGS_PANEL:
 							Text: Clear
 							Font: Bold
 							TooltipText: Unbind the hotkey
-							TooltipContainer: TOOLTIP_CONTAINER
+							TooltipContainer: SETTINGS_TOOLTIP_CONTAINER
 							TooltipTemplate: SIMPLE_TOOLTIP
 						Button@RESET_HOTKEY_BUTTON:
 							X: PARENT_RIGHT - WIDTH - 20
@@ -704,7 +737,7 @@ Background@SETTINGS_PANEL:
 							Text: Reset
 							Font: Bold
 							TooltipText: Reset to default
-							TooltipContainer: TOOLTIP_CONTAINER
+							TooltipContainer: SETTINGS_TOOLTIP_CONTAINER
 							TooltipTemplate: SIMPLE_TOOLTIP
 		Container@ADVANCED_PANEL:
 			X: 5
@@ -824,4 +857,4 @@ Background@SETTINGS_PANEL:
 							Height: 20
 							Font: Regular
 							Text: Enable Debug Commands in Replays
-		TooltipContainer@TOOLTIP_CONTAINER:
+		TooltipContainer@SETTINGS_TOOLTIP_CONTAINER:

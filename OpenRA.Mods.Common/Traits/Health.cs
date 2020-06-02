@@ -16,7 +16,7 @@ using OpenRA.Traits;
 
 namespace OpenRA.Mods.Common.Traits
 {
-	public class HealthInfo : IHealthInfo, IRulesetLoaded, IEditorActorOptions
+	public class HealthInfo : TraitInfo, IHealthInfo, IRulesetLoaded, IEditorActorOptions
 	{
 		[Desc("HitPoints")]
 		public readonly int HP = 0;
@@ -27,7 +27,7 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Display order for the health slider in the map editor")]
 		public readonly int EditorHealthDisplayOrder = 2;
 
-		public virtual object Create(ActorInitializer init) { return new Health(init, this); }
+		public override object Create(ActorInitializer init) { return new Health(init, this); }
 
 		public void RulesetLoaded(Ruleset rules, ActorInfo ai)
 		{
@@ -43,7 +43,7 @@ namespace OpenRA.Mods.Common.Traits
 				actor =>
 				{
 					var init = actor.Init<HealthInit>();
-					return init != null ? init.Value(world) : 100;
+					return init != null ? init.Value : 100;
 				},
 				(actor, value) => actor.ReplaceInit(new HealthInit((int)value)));
 		}
@@ -68,10 +68,12 @@ namespace OpenRA.Mods.Common.Traits
 		public Health(ActorInitializer init, HealthInfo info)
 		{
 			Info = info;
-			MaxHP = info.HP > 0 ? info.HP : 1;
+			MaxHP = hp = info.HP > 0 ? info.HP : 1;
 
 			// Cast to long to avoid overflow when multiplying by the health
-			hp = init.Contains<HealthInit>() ? (int)(init.Get<HealthInit, int>() * (long)MaxHP / 100) : MaxHP;
+			var healthInit = init.GetOrDefault<HealthInit>(info);
+			if (healthInit != null)
+				hp = (int)(healthInit.Value * (long)MaxHP / 100);
 
 			DisplayHP = hp;
 		}
@@ -247,12 +249,15 @@ namespace OpenRA.Mods.Common.Traits
 			value = init;
 		}
 
-		public int Value(World world)
+		public int Value
 		{
-			if (value < 0 || (value == 0 && !allowZero))
-				return 1;
+			get
+			{
+				if (value < 0 || (value == 0 && !allowZero))
+					return 1;
 
-			return value;
+				return value;
+			}
 		}
 	}
 }

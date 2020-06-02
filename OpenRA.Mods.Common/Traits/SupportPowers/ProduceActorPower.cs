@@ -47,7 +47,7 @@ namespace OpenRA.Mods.Common.Traits
 		public ProduceActorPower(ActorInitializer init, ProduceActorPowerInfo info)
 			: base(init.Self, info)
 		{
-			faction = init.Contains<FactionInit>() ? init.Get<FactionInit, string>() : init.Self.Owner.Faction.InternalName;
+			faction = init.GetValue<FactionInit, string>(info, init.Self.Owner.Faction.InternalName);
 		}
 
 		public override void SelectTarget(Actor self, string order, SupportPowerManager manager)
@@ -58,6 +58,7 @@ namespace OpenRA.Mods.Common.Traits
 		public override void Activate(Actor self, Order order, SupportPowerManager manager)
 		{
 			base.Activate(self, order, manager);
+			PlayLaunchSounds();
 
 			var info = Info as ProduceActorPowerInfo;
 			var producers = self.World.ActorsWithTrait<Production>()

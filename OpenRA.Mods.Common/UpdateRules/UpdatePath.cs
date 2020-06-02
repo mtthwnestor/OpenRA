@@ -34,70 +34,37 @@ namespace OpenRA.Mods.Common.UpdateRules
 			Justification = "Extracting update lists to temporary variables obfuscates the definitions.")]
 		static readonly UpdatePath[] Paths =
 		{
-			new UpdatePath("release-20181215", "release-20190314", new UpdateRule[]
+			new UpdatePath("release-20191117", "release-20200202", new UpdateRule[]
 			{
-				new AddCarryableHarvester(),
-				new RenameEditorTilesetFilter(),
-				new DefineNotificationDefaults(),
-				new MergeRearmAndRepairAnimation(),
-				new MergeCaptureTraits(),
-				new RemovedNotifyBuildComplete(),
-				new LowPowerSlowdownToModifier(),
-				new ChangeTakeOffSoundAndLandingSound(),
-				new RemoveHealthPercentageRing(),
-				new RenameCrateActionNotification(),
-				new RemoveRepairBuildingsFromAircraft(),
-				new AddRearmable(),
-				new MergeAttackPlaneAndHeli(),
-				new RemovedDemolishLocking(),
-				new RequireProductionType(),
-				new CloakRequiresConditionToPause(),
-				new ExtractHackyAIModules(),
-				new RemoveNegativeDamageFullHealthCheck(),
-				new RemoveResourceExplodeModifier(),
-				new DefineLevelUpImageDefault(),
-				new RemovedAutoCarryallCircleTurnSpeed(),
-				new RemoveAttackIgnoresVisibility(),
-				new ReplacedWithChargeAnimation(),
-				new RefactorResourceLevelAnimating(),
-				new RemoveAttackSuicides(),
+				new ReplaceAttackTypeStrafe()
 			}),
 
-			new UpdatePath("release-20190314", "release-20191117", new UpdateRule[]
+			new UpdatePath("release-20200202", "release-20200503", new UpdateRule[]
 			{
-				new MultipleDeploySounds(),
-				new RemoveSimpleBeacon(),
-				new MakeMobilePausableConditional(),
-				new StreamlineRepairableTraits(),
-				new ReplaceSpecialMoveConsiderations(),
-				new RefactorHarvesterIdle(),
-				new SplitHarvesterSpriteBody(),
-				new RenameAttackMoveConditions(),
-				new RemovePlaceBuildingPalettes(),
-				new RenameHoversOffsetModifier(),
-				new AddAirAttackTypes(),
-				new MoveAbortOnResupply(),
-				new RenameCarryallDelays(),
-				new AddCanSlide(),
-				new AddAircraftIdleBehavior(),
-				new RenameSearchRadius(),
-				new RenameChronoshiftFootprint(),
-				new RemoveMoveIntoWorldFromExit(),
-			}),
-
-			new UpdatePath("release-20191117", new UpdateRule[]
-			{
-				// Bleed only changes here
 				new RemoveYesNo(),
 				new RemoveInitialFacingHardcoding(),
 				new RemoveAirdropActorTypeDefault(),
 				new RenameProneTime(),
-				new ReplaceAttackTypeStrafe(),
 				new RemoveWithPermanentInjury(),
 				new AddResourceRenderer(),
 				new ReformatChromeProvider(),
 				new RenameSpins(),
 				new CreateScreenShakeWarhead(),
+				new RenameRallyPointPath(),
+			}),
+
+			new UpdatePath("release-20200503", new UpdateRule[]
+			{
+				// Bleed only changes here
+				new AddPipDecorationTraits(),
+				new ModernizeDecorationTraits(),
+				new RenameHealCrateAction(),
+				new RenameInfiltrationNotifications(),
+				new MoveClassicFacingFudge(),
+				new RenameWithNukeLaunch(),
+				new SpawnActorPowerDefaultEffect(),
+				new RemoveConditionManager(),
+				new ConvertSupportPowerRangesToFootprint(),
 			})
 		};
 

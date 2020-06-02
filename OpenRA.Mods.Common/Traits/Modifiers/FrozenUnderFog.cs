@@ -19,12 +19,12 @@ using OpenRA.Traits;
 namespace OpenRA.Mods.Common.Traits
 {
 	[Desc("This actor will remain visible (but not updated visually) under fog, once discovered.")]
-	public class FrozenUnderFogInfo : ITraitInfo, Requires<BuildingInfo>, IDefaultVisibilityInfo
+	public class FrozenUnderFogInfo : TraitInfo, Requires<BuildingInfo>, IDefaultVisibilityInfo
 	{
 		[Desc("Players with these stances can always see the actor.")]
 		public readonly Stance AlwaysVisibleStances = Stance.Ally;
 
-		public object Create(ActorInitializer init) { return new FrozenUnderFog(init, this); }
+		public override object Create(ActorInitializer init) { return new FrozenUnderFog(init, this); }
 	}
 
 	public class FrozenUnderFog : ICreatesFrozenActors, IRenderModifier, IDefaultVisibility, ITick, ITickRender, ISync, INotifyCreated, INotifyOwnerChanged, INotifyActorDisposing
@@ -59,7 +59,7 @@ namespace OpenRA.Mods.Common.Traits
 			// Explore map-placed actors if the "Explore Map" option is enabled
 			var shroudInfo = init.World.Map.Rules.Actors["player"].TraitInfo<ShroudInfo>();
 			var exploredMap = init.World.LobbyInfo.GlobalSettings.OptionOrDefault("explored", shroudInfo.ExploredMapCheckboxEnabled);
-			startsRevealed = exploredMap && init.Contains<SpawnedByMapInit>() && !init.Contains<HiddenUnderFogInit>();
+			startsRevealed = exploredMap && init.Contains<SpawnedByMapInit>(info) && !init.Contains<HiddenUnderFogInit>(info);
 			var buildingInfo = init.Self.Info.TraitInfoOrDefault<BuildingInfo>();
 			var footprintCells = buildingInfo != null ? buildingInfo.FrozenUnderFogTiles(init.Self.Location).ToList() : new List<CPos>() { init.Self.Location };
 			footprint = footprintCells.SelectMany(c => map.ProjectedCellsCovering(c.ToMPos(map))).ToArray();
@@ -145,7 +145,7 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			IRenderable[] renderables = null;
 			Rectangle[] bounds = null;
-			Rectangle mouseBounds = Rectangle.Empty;
+			var mouseBounds = Polygon.Empty;
 			for (var playerIndex = 0; playerIndex < frozenStates.Count; playerIndex++)
 			{
 				var frozen = frozenStates[playerIndex].FrozenActor;

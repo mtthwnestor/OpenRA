@@ -31,6 +31,15 @@ namespace OpenRA
 		public RgbaColorRenderer RgbaColorRenderer { get; private set; }
 		public SpriteRenderer SpriteRenderer { get; private set; }
 		public RgbaSpriteRenderer RgbaSpriteRenderer { get; private set; }
+
+		public bool WindowHasInputFocus
+		{
+			get
+			{
+				return Window.HasInputFocus;
+			}
+		}
+
 		public IReadOnlyDictionary<string, SpriteFont> Fonts;
 
 		internal IPlatformWindow Window { get; private set; }
@@ -66,7 +75,10 @@ namespace OpenRA
 			this.platform = platform;
 			var resolution = GetResolution(graphicSettings);
 
-			Window = platform.CreateWindow(new Size(resolution.Width, resolution.Height), graphicSettings.Mode, graphicSettings.UIScale, graphicSettings.BatchSize);
+			Window = platform.CreateWindow(new Size(resolution.Width, resolution.Height),
+				graphicSettings.Mode, graphicSettings.UIScale, graphicSettings.BatchSize,
+				graphicSettings.VideoDisplay, graphicSettings.GLProfile);
+
 			Context = Window.Context;
 
 			TempBufferSize = graphicSettings.BatchSize;
@@ -301,6 +313,8 @@ namespace OpenRA
 		public Size NativeResolution { get { return Window.NativeWindowSize; } }
 		public float WindowScale { get { return Window.EffectiveWindowScale; } }
 		public float NativeWindowScale { get { return Window.NativeWindowScale; } }
+		public GLProfile GLProfile { get { return Window.GLProfile; } }
+		public GLProfile[] SupportedGLProfiles { get { return Window.SupportedGLProfiles; } }
 
 		public interface IBatchRenderer { void Flush(); }
 
@@ -477,6 +491,16 @@ namespace OpenRA
 		public IFont CreateFont(byte[] data)
 		{
 			return platform.CreateFont(data);
+		}
+
+		public int DisplayCount
+		{
+			get { return Window.DisplayCount; }
+		}
+
+		public int CurrentDisplay
+		{
+			get { return Window.CurrentDisplay; }
 		}
 	}
 }

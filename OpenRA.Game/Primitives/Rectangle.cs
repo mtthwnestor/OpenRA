@@ -66,6 +66,11 @@ namespace OpenRA.Primitives
 		public int2 Location { get { return new int2(X, Y); } }
 		public Size Size { get { return new Size(Width, Height); } }
 
+		public int2 TopLeft { get { return Location; } }
+		public int2 TopRight { get { return new int2(X + Width, Y); } }
+		public int2 BottomLeft { get { return new int2(X, Y + Height); } }
+		public int2 BottomRight { get { return new int2(X + Width, Y + Height); } }
+
 		public bool Contains(int x, int y)
 		{
 			return x >= Left && x < Right && y >= Top && y < Bottom;
@@ -116,6 +121,8 @@ namespace OpenRA.Primitives
 		{
 			return rect == Intersect(this, rect);
 		}
+
+		public static Rectangle operator *(int a, Rectangle b) { return new Rectangle(a * b.X, a * b.Y, a * b.Width, a * b.Height); }
 
 		public override string ToString()
 		{

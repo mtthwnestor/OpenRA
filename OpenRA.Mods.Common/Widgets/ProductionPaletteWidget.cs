@@ -55,6 +55,7 @@ namespace OpenRA.Mods.Common.Widgets
 		// Note: LinterHotkeyNames assumes that these are disabled by default
 		public readonly string HotkeyPrefix = null;
 		public readonly int HotkeyCount = 0;
+		public readonly HotkeyReference SelectProductionBuildingHotkey = new HotkeyReference();
 
 		public readonly string ClockAnimation = "clock";
 		public readonly string ClockSequence = "idle";
@@ -367,12 +368,37 @@ namespace OpenRA.Mods.Common.Widgets
 			if (e.Event == KeyInputEvent.Up || CurrentQueue == null)
 				return false;
 
+			if (SelectProductionBuildingHotkey.IsActivatedBy(e))
+				return SelectProductionBuilding();
+
 			var batchModifiers = e.Modifiers.HasModifier(Modifiers.Shift) ? Modifiers.Shift : Modifiers.None;
 
 			// HACK: enable production if the shift key is pressed
 			e.Modifiers &= ~Modifiers.Shift;
 			var toBuild = icons.Values.FirstOrDefault(i => i.Hotkey != null && i.Hotkey.IsActivatedBy(e));
 			return toBuild != null ? HandleEvent(toBuild, MouseButton.Left, batchModifiers) : false;
+		}
+
+		bool SelectProductionBuilding()
+		{
+			var viewport = worldRenderer.Viewport;
+			var selection = World.Selection;
+
+			if (CurrentQueue == null)
+				return true;
+
+			var facility = CurrentQueue.MostLikelyProducer().Actor;
+
+			if (facility == null || facility.OccupiesSpace == null)
+				return true;
+
+			if (selection.Actors.Count() == 1 && selection.Contains(facility))
+				viewport.Center(selection.Actors);
+			else
+				selection.Combine(World, new[] { facility }, false, true);
+
+			Game.Sound.PlayNotification(World.Map.Rules, null, "Sounds", ClickSound, null);
+			return true;
 		}
 
 		public void RefreshIcons()
@@ -407,13 +433,15 @@ namespace OpenRA.Mods.Common.Widgets
 				var bi = item.TraitInfo<BuildableInfo>();
 				icon.Play(bi.Icon);
 
+				var palette = bi.IconPaletteIsPlayerPalette ? bi.IconPalette + producer.Actor.Owner.InternalName : bi.IconPalette;
+
 				var pi = new ProductionIcon()
 				{
 					Actor = item,
 					Name = item.Name,
 					Hotkey = DisplayedIconCount < HotkeyCount ? hotkeys[DisplayedIconCount] : null,
 					Sprite = icon.Image,
-					Palette = worldRenderer.Palette(bi.IconPalette),
+					Palette = worldRenderer.Palette(palette),
 					IconClockPalette = worldRenderer.Palette(ClockPalette),
 					IconDarkenPalette = worldRenderer.Palette(NotBuildablePalette),
 					Pos = new float2(rect.Location),

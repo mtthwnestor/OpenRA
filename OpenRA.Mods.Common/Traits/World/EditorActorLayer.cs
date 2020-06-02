@@ -20,12 +20,12 @@ using OpenRA.Traits;
 namespace OpenRA.Mods.Common.Traits
 {
 	[Desc("Required for the map editor to work. Attach this to the world actor.")]
-	public class EditorActorLayerInfo : ITraitInfo
+	public class EditorActorLayerInfo : TraitInfo
 	{
 		[Desc("Size of partition bins (world pixels)")]
 		public readonly int BinSize = 250;
 
-		public object Create(ActorInitializer init) { return new EditorActorLayer(init.Self, this); }
+		public override object Create(ActorInitializer init) { return new EditorActorLayer(init.Self, this); }
 	}
 
 	public class EditorActorLayer : IWorldLoaded, ITickRender, IRender, IRadarSignature, ICreatePlayers, IRenderAnnotations
@@ -118,8 +118,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public EditorActorPreview Add(string id, ActorReference reference, bool initialSetup = false)
 		{
-			var owner = Players.Players[reference.InitDict.Get<OwnerInit>().PlayerName];
-
+			var owner = Players.Players[reference.InitDict.Get<OwnerInit>().InternalName];
 			var preview = new EditorActorPreview(worldRenderer, id, reference, owner);
 
 			Add(preview, initialSetup);
@@ -133,12 +132,13 @@ namespace OpenRA.Mods.Common.Traits
 			if (!preview.Bounds.IsEmpty)
 				screenMap.Add(preview, preview.Bounds);
 
-			foreach (var kv in preview.Footprint)
-				AddPreviewLocation(preview, kv.Key);
-
 			// Fallback to the actor's CenterPosition for the ActorMap if it has no Footprint
-			if (!preview.Footprint.Any())
-				AddPreviewLocation(preview, worldRenderer.World.Map.CellContaining(preview.CenterPosition));
+			var footprint = preview.Footprint.Select(kv => kv.Key).ToArray();
+			if (!footprint.Any())
+				footprint = new[] { worldRenderer.World.Map.CellContaining(preview.CenterPosition) };
+
+			foreach (var cell in footprint)
+				AddPreviewLocation(preview, cell);
 
 			if (!initialSetup)
 			{
@@ -154,16 +154,21 @@ namespace OpenRA.Mods.Common.Traits
 			previews.Remove(preview);
 			screenMap.Remove(preview);
 
-			foreach (var kv in preview.Footprint)
+			// Fallback to the actor's CenterPosition for the ActorMap if it has no Footprint
+			var footprint = preview.Footprint.Select(kv => kv.Key).ToArray();
+			if (!footprint.Any())
+				footprint = new[] { worldRenderer.World.Map.CellContaining(preview.CenterPosition) };
+
+			foreach (var cell in footprint)
 			{
 				List<EditorActorPreview> list;
-				if (!cellMap.TryGetValue(kv.Key, out list))
+				if (!cellMap.TryGetValue(cell, out list))
 					continue;
 
 				list.Remove(preview);
 
 				if (!list.Any())
-					cellMap.Remove(kv.Key);
+					cellMap.Remove(cell);
 			}
 
 			UpdateNeighbours(preview.Footprint);

@@ -82,12 +82,11 @@ namespace OpenRA
 		[Desc("Sets the timestamp format. Defaults to the ISO 8601 standard.")]
 		public string TimestampFormat = "yyyy-MM-ddTHH:mm:ss";
 
-		[Desc("Path to a MaxMind GeoLite2 database to use for player geo-location.",
-			"Database files can be downloaded from https://dev.maxmind.com/geoip/geoip2/geolite2/")]
-		public string GeoIPDatabase = null;
-
 		[Desc("Allow clients to see anonymised IPs for other clients.")]
 		public bool ShareAnonymizedIPs = true;
+
+		[Desc("Allow clients to see the country of other clients.")]
+		public bool EnableGeoIP = true;
 
 		public ServerSettings Clone()
 		{
@@ -173,8 +172,14 @@ namespace OpenRA
 		[Desc("Disable operating-system provided cursor rendering.")]
 		public bool DisableHardwareCursors = false;
 
-		[Desc("Use OpenGL ES if both ES and regular OpenGL are available.")]
-		public bool PreferGLES = false;
+		[Desc("Display index to use in a multi-monitor fullscreen setup.")]
+		public int VideoDisplay = 0;
+
+		[Desc("Preferred OpenGL profile to use.",
+			"Modern: OpenGL Core Profile 3.2 or greater.",
+			"Embedded: OpenGL ES 3.0 or greater.",
+			"Legacy: OpenGL 2.1 with framebuffer_object extension.")]
+		public GLProfile GLProfile = GLProfile.Modern;
 
 		public int BatchSize = 8192;
 		public int SheetSize = 2048;
@@ -196,13 +201,14 @@ namespace OpenRA
 
 		public bool CashTicks = true;
 		public bool Mute = false;
+		public bool MuteBackgroundMusic = false;
 	}
 
 	public class PlayerSettings
 	{
-		[Desc("Sets the player nickname for in-game and IRC chat.")]
-		public string Name = "Newbie";
-		public Color Color = Color.FromAhsl(75, 255, 180);
+		[Desc("Sets the player nickname.")]
+		public string Name = "Commander";
+		public Color Color = Color.FromArgb(200, 32, 32);
 		public string LastServer = "localhost:1234";
 		public Color[] CustomColors = { };
 	}
@@ -224,7 +230,8 @@ namespace OpenRA
 		public int MouseScrollDeadzone = 8;
 
 		public bool UseClassicMouseStyle = false;
-		public bool ClassicMouseMiddleScroll = false;
+		public bool UseAlternateScrollButton = false;
+
 		public StatusBarsType StatusBars = StatusBarsType.Standard;
 		public TargetLinesType TargetLines = TargetLinesType.Manual;
 		public bool UsePlayerStanceColors = false;
@@ -237,6 +244,9 @@ namespace OpenRA
 		public Modifiers ZoomModifier = Modifiers.None;
 
 		public bool FetchNews = true;
+
+		[Desc("Version of introduction prompt that the player last viewed.")]
+		public int IntroductionPromptVersion = 0;
 
 		public MPGameFilters MPGameFilters = MPGameFilters.Waiting | MPGameFilters.Empty | MPGameFilters.Protected | MPGameFilters.Started;
 	}

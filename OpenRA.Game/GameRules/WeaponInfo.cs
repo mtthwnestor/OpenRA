@@ -24,8 +24,8 @@ namespace OpenRA.GameRules
 		public int[] DamageModifiers;
 		public int[] InaccuracyModifiers;
 		public int[] RangeModifiers;
-		public int Facing;
-		public Func<int> CurrentMuzzleFacing;
+		public WAngle Facing;
+		public Func<WAngle> CurrentMuzzleFacing;
 		public WPos Source;
 		public Func<WPos> CurrentSource;
 		public Actor SourceActor;
@@ -37,7 +37,7 @@ namespace OpenRA.GameRules
 	{
 		public WeaponInfo Weapon;
 		public int[] DamageModifiers = { };
-		public WPos Source;
+		public WPos? Source;
 		public Actor SourceActor;
 		public Target WeaponTarget;
 
@@ -48,6 +48,16 @@ namespace OpenRA.GameRules
 			Source = args.Source;
 			SourceActor = args.SourceActor;
 			WeaponTarget = args.GuidedTarget;
+		}
+
+		// For places that only want to update some of the fields (usually DamageModifiers)
+		public WarheadArgs(WarheadArgs args)
+		{
+			Weapon = args.Weapon;
+			DamageModifiers = args.DamageModifiers;
+			Source = args.Source;
+			SourceActor = args.SourceActor;
+			WeaponTarget = args.WeaponTarget;
 		}
 
 		// Default empty constructor for callers that want to initialize fields themselves
@@ -203,12 +213,10 @@ namespace OpenRA.GameRules
 			var world = args.SourceActor.World;
 			foreach (var warhead in Warheads)
 			{
-				var wh = warhead; // force the closure to bind to the current warhead
-
-				if (wh.Delay > 0)
-			 		world.AddFrameEndTask(w => w.Add(new DelayedImpact(wh.Delay, wh, target, args)));
+				if (warhead.Delay > 0)
+					world.AddFrameEndTask(w => w.Add(new DelayedImpact(warhead.Delay, warhead, target, args)));
 				else
-					wh.DoImpact(target, args);
+					warhead.DoImpact(target, args);
 			}
 		}
 
@@ -219,10 +227,12 @@ namespace OpenRA.GameRules
 			var args = new WarheadArgs
 			{
 				Weapon = this,
-				Source = firedBy.CenterPosition,
 				SourceActor = firedBy,
 				WeaponTarget = target
 			};
+
+			if (firedBy.OccupiesSpace != null)
+				args.Source = firedBy.CenterPosition;
 
 			Impact(target, args);
 		}

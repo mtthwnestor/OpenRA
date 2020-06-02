@@ -139,6 +139,12 @@ namespace OpenRA.Mods.Common.Traits
 		[Desc("Boolean expression defining the condition under which the regular (non-force) move cursor is disabled.")]
 		public readonly BooleanExpression RequireForceMoveCondition = null;
 
+		[Desc("Cursor to display when able to land at target building.")]
+		public readonly string EnterCursor = "enter";
+
+		[Desc("Cursor to display when unable to land at target building.")]
+		public readonly string EnterBlockedCursor = "enter-blocked";
+
 		public int GetInitialFacing() { return InitialFacing; }
 		public WDist GetCruiseAltitude() { return CruiseAltitude; }
 
@@ -179,7 +185,7 @@ namespace OpenRA.Mods.Common.Traits
 				actor =>
 				{
 					var init = actor.Init<FacingInit>();
-					return init != null ? init.Value(world) : InitialFacing;
+					return init != null ? init.Value : InitialFacing;
 				},
 				(actor, value) => actor.ReplaceInit(new FacingInit((int)value)));
 		}
@@ -196,7 +202,6 @@ namespace OpenRA.Mods.Common.Traits
 		Repairable repairable;
 		Rearmable rearmable;
 		IAircraftCenterPositionOffset[] positionOffsets;
-		ConditionManager conditionManager;
 		IDisposable reservation;
 		IEnumerable<int> speedModifiers;
 		INotifyMoving[] notifyMoving;
@@ -204,13 +209,21 @@ namespace OpenRA.Mods.Common.Traits
 		IOverrideAircraftLanding overrideAircraftLanding;
 
 		[Sync]
-		public int Facing { get; set; }
+		public WAngle Facing;
+
+		int IFacing.Facing
+		{
+			get { return Facing.Facing; }
+			set { Facing = WAngle.FromFacing(value); }
+		}
 
 		[Sync]
 		public WPos CenterPosition { get; private set; }
 
 		public CPos TopLeft { get { return self.World.Map.CellContaining(CenterPosition); } }
-		public int TurnSpeed { get { return !IsTraitDisabled && !IsTraitPaused ? Info.TurnSpeed : 0; } }
+		public int TurnSpeed { get { return !IsTraitDisabled && !IsTraitPaused ? 4 * Info.TurnSpeed : 0; } }
+		public int IdleTurnSpeed { get { return Info.IdleTurnSpeed != -1 ? 4 * Info.IdleTurnSpeed : -1; } }
+
 		public Actor ReservedActor { get; private set; }
 		public bool MayYieldReservation { get; private set; }
 		public bool ForceLanding { get; private set; }
@@ -230,28 +243,28 @@ namespace OpenRA.Mods.Common.Traits
 
 		bool airborne;
 		bool cruising;
-		int airborneToken = ConditionManager.InvalidConditionToken;
-		int cruisingToken = ConditionManager.InvalidConditionToken;
+		int airborneToken = Actor.InvalidConditionToken;
+		int cruisingToken = Actor.InvalidConditionToken;
 
 		MovementType movementTypes;
 		WPos cachedPosition;
-		int cachedFacing;
+		WAngle cachedFacing;
 
 		public Aircraft(ActorInitializer init, AircraftInfo info)
 			: base(info)
 		{
 			self = init.Self;
 
-			if (init.Contains<LocationInit>())
-				SetPosition(self, init.Get<LocationInit, CPos>());
+			var locationInit = init.GetOrDefault<LocationInit>(info);
+			if (locationInit != null)
+				SetPosition(self, locationInit.Value);
 
-			if (init.Contains<CenterPositionInit>())
-				SetPosition(self, init.Get<CenterPositionInit, WPos>());
+			var centerPositionInit = init.GetOrDefault<CenterPositionInit>(info);
+			if (centerPositionInit != null)
+				SetPosition(self, centerPositionInit.Value);
 
-			Facing = init.Contains<FacingInit>() ? init.Get<FacingInit, int>() : Info.InitialFacing;
-
-			if (init.Contains<CreationActivityDelayInit>())
-				creationActivityDelay = init.Get<CreationActivityDelayInit, int>();
+			Facing = WAngle.FromFacing(init.GetValue<FacingInit, int>(info, Info.InitialFacing));
+			creationActivityDelay = init.GetValue<CreationActivityDelayInit, int>(info, 0);
 		}
 
 		public WDist LandAltitude
@@ -293,7 +306,6 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			repairable = self.TraitOrDefault<Repairable>();
 			rearmable = self.TraitOrDefault<Rearmable>();
-			conditionManager = self.TraitOrDefault<ConditionManager>();
 			speedModifiers = self.TraitsImplementing<ISpeedModifier>().ToArray().Select(sm => sm.GetSpeedModifier());
 			cachedPosition = self.CenterPosition;
 			notifyMoving = self.TraitsImplementing<INotifyMoving>().ToArray();
@@ -389,7 +401,7 @@ namespace OpenRA.Mods.Common.Traits
 			// HACK: Prevent updating visibility twice per tick. We really shouldn't be
 			// moving twice in a tick in the first place.
 			notify = false;
-			SetPosition(self, CenterPosition + FlyStep(speed, repulsionForce.Yaw.Facing));
+			SetPosition(self, CenterPosition + FlyStep(speed, repulsionForce.Yaw));
 			notify = true;
 		}
 
@@ -429,7 +441,7 @@ namespace OpenRA.Mods.Common.Traits
 				// The map bounds are in projected coordinates, which is technically wrong for this,
 				// but we avoid the issues in practice by guessing the middle of the map instead of the edge
 				var center = WPos.Lerp(self.World.Map.ProjectedTopLeft, self.World.Map.ProjectedBottomRight, 1, 2);
-				repulsionForce += new WVec(1024, 0, 0).Rotate(WRot.FromYaw((self.CenterPosition - center).Yaw));
+				repulsionForce += new WVec(0, 1024, 0).Rotate(WRot.FromYaw((self.CenterPosition - center).Yaw));
 			}
 
 			if (Info.CanSlide)
@@ -554,14 +566,14 @@ namespace OpenRA.Mods.Common.Traits
 			return new[] { Pair.New(TopLeft, SubCell.FullCell) };
 		}
 
-		public WVec FlyStep(int facing)
+		public WVec FlyStep(WAngle facing)
 		{
 			return FlyStep(MovementSpeed, facing);
 		}
 
-		public WVec FlyStep(int speed, int facing)
+		public WVec FlyStep(int speed, WAngle facing)
 		{
-			var dir = new WVec(0, -1024, 0).Rotate(WRot.FromFacing(facing));
+			var dir = new WVec(0, -1024, 0).Rotate(WRot.FromYaw(facing));
 			return speed * dir / 1024;
 		}
 
@@ -659,7 +671,7 @@ namespace OpenRA.Mods.Common.Traits
 
 		public void ModifyDeathActorInit(Actor self, TypeDictionary init)
 		{
-			init.Add(new FacingInit(Facing));
+			init.Add(new FacingInit(Facing.Facing));
 		}
 
 		void INotifyBecomingIdle.OnBecomingIdle(Actor self)
@@ -939,11 +951,19 @@ namespace OpenRA.Mods.Common.Traits
 		{
 			get
 			{
-				yield return new EnterAlliedActorTargeter<BuildingInfo>("ForceEnter", 6,
+				yield return new EnterAlliedActorTargeter<BuildingInfo>(
+					"ForceEnter",
+					6,
+					Info.EnterCursor,
+					Info.EnterBlockedCursor,
 					(target, modifiers) => Info.CanForceLand && modifiers.HasModifier(TargetModifiers.ForceMove) && AircraftCanEnter(target),
 					target => Reservable.IsAvailableFor(target, self) && AircraftCanResupplyAt(target, true));
 
-				yield return new EnterAlliedActorTargeter<BuildingInfo>("Enter", 5,
+				yield return new EnterAlliedActorTargeter<BuildingInfo>(
+					"Enter",
+					5,
+					Info.EnterCursor,
+					Info.EnterBlockedCursor,
 					AircraftCanEnter,
 					target => Reservable.IsAvailableFor(target, self) && AircraftCanResupplyAt(target, !Info.TakeOffOnResupply));
 
@@ -968,7 +988,7 @@ namespace OpenRA.Mods.Common.Traits
 			return new Order("ReturnToBase", self, queued);
 		}
 
-		bool IIssueDeployOrder.CanIssueDeployOrder(Actor self) { return rearmable != null && rearmable.Info.RearmActors.Any(); }
+		bool IIssueDeployOrder.CanIssueDeployOrder(Actor self, bool queued) { return rearmable != null && rearmable.Info.RearmActors.Any(); }
 
 		public string VoicePhraseForOrder(Actor self, Order order)
 		{
@@ -1070,10 +1090,10 @@ namespace OpenRA.Mods.Common.Traits
 				self.CancelActivity();
 				UnReserve();
 			}
-			else if (orderString == "ReturnToBase" && rearmable != null && rearmable.Info.RearmActors.Any())
+			else if (orderString == "ReturnToBase")
 			{
-				// Don't restart activity every time deploy hotkey is triggered
-				if (self.CurrentActivity is ReturnToBase || GetActorBelow() != null)
+				// Do nothing if not rearmable and don't restart activity every time deploy hotkey is triggered
+				if (rearmable == null || !rearmable.Info.RearmActors.Any() || self.CurrentActivity is ReturnToBase || GetActorBelow() != null)
 					return;
 
 				if (!order.Queued)
@@ -1116,8 +1136,8 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			airborne = true;
-			if (conditionManager != null && !string.IsNullOrEmpty(Info.AirborneCondition) && airborneToken == ConditionManager.InvalidConditionToken)
-				airborneToken = conditionManager.GrantCondition(self, Info.AirborneCondition);
+			if (airborneToken == Actor.InvalidConditionToken)
+				airborneToken = self.GrantCondition(Info.AirborneCondition);
 		}
 
 		void OnAirborneAltitudeLeft()
@@ -1126,8 +1146,8 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			airborne = false;
-			if (conditionManager != null && airborneToken != ConditionManager.InvalidConditionToken)
-				airborneToken = conditionManager.RevokeCondition(self, airborneToken);
+			if (airborneToken != Actor.InvalidConditionToken)
+				airborneToken = self.RevokeCondition(airborneToken);
 		}
 
 		#endregion
@@ -1140,8 +1160,8 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			cruising = true;
-			if (conditionManager != null && !string.IsNullOrEmpty(Info.CruisingCondition) && cruisingToken == ConditionManager.InvalidConditionToken)
-				cruisingToken = conditionManager.GrantCondition(self, Info.CruisingCondition);
+			if (cruisingToken == Actor.InvalidConditionToken)
+				cruisingToken = self.GrantCondition(Info.CruisingCondition);
 		}
 
 		void OnCruisingAltitudeLeft()
@@ -1150,8 +1170,8 @@ namespace OpenRA.Mods.Common.Traits
 				return;
 
 			cruising = false;
-			if (conditionManager != null && cruisingToken != ConditionManager.InvalidConditionToken)
-				cruisingToken = conditionManager.RevokeCondition(self, cruisingToken);
+			if (cruisingToken != Actor.InvalidConditionToken)
+				cruisingToken = self.RevokeCondition(cruisingToken);
 		}
 
 		#endregion
@@ -1164,7 +1184,7 @@ namespace OpenRA.Mods.Common.Traits
 		void IActorPreviewInitModifier.ModifyActorPreviewInit(Actor self, TypeDictionary inits)
 		{
 			if (!inits.Contains<DynamicFacingInit>() && !inits.Contains<FacingInit>())
-				inits.Add(new DynamicFacingInit(() => Facing));
+				inits.Add(new DynamicFacingInit(() => Facing.Facing));
 		}
 
 		Activity ICreationActivity.GetCreationActivity()

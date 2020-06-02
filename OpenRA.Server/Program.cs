@@ -10,6 +10,7 @@
 #endregion
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Threading;
@@ -30,6 +31,7 @@ namespace OpenRA.Server
 			Log.AddChannel("perf", "dedicated-perf.log", true);
 			Log.AddChannel("server", "dedicated-server.log", true);
 			Log.AddChannel("nat", "dedicated-nat.log", true);
+			Log.AddChannel("geoip", "dedicated-geoip.log", true);
 
 			// Special case handling of Game.Mod argument: if it matches a real filesystem path
 			// then we use this to override the mod search path, and replace it with the mod id
@@ -65,7 +67,9 @@ namespace OpenRA.Server
 
 				settings.Map = modData.MapCache.ChooseInitialMap(settings.Map, new MersenneTwister());
 
-				var server = new Server(new IPEndPoint(IPAddress.Any, settings.ListenPort), settings, modData, ServerType.Dedicated);
+				var endpoints = new List<IPEndPoint> { new IPEndPoint(IPAddress.IPv6Any, settings.ListenPort), new IPEndPoint(IPAddress.Any, settings.ListenPort) };
+				var server = new Server(endpoints, settings, modData, ServerType.Dedicated);
+
 				GC.Collect();
 				while (true)
 				{
